@@ -1,0 +1,225 @@
+# Use this version for the Sense Board - Buttons are larger for touch
+import tkinter as tk
+from tkinter import messagebox, simpledialog, ttk
+import random
+from datetime import date, datetime, timedelta
+import calendar
+
+# --- DATA ---
+STUDENTS = ["Namish", "Shreyash", "Arham", "Keyaan", "Animesh", 
+            "Jayanshu", "Yatharth", "Vineet", "Manan", "Samarth", 
+            "Neel", "Sameer"]
+
+FORBIDDEN_PAIRS = [
+    ("Sameer", "Animesh"), ("Keyaan", "Yatharth"), 
+    ("Namish", "Arham"), ("Samarth", "Shreyash"), 
+    ("Neel", "Manan")
+]
+
+MOVIES = {
+    "Easy": ["1 Million", "Dangal", "Pushpa", "KGF", "Singham", "Don", "Sholay", "RRR", "Avatar", "Spider-Man", "Baahubali", "Tiger Zinda Hai", "Golmaal", "Housefull", "War", "Kick", "Dhoom", "Chennai Express", "Kabir Singh", "Pathaan", "Jawan"],
+    "Mid": ["1 Million", "Tumbbad", "Drishyam", "Vikram", "Kantara", "Stree", "Lagaan", "Andhadhun", "Badla", "Article 15", "Lunchbox", "Piku", "Queen", "Barfi", "Mahaul Theek Hai", "Hera Pheri", "Bhool Bhulaiyaa", "Talvar", "Munda Southhal Da", "Khosla Ka Ghosla", "A Wednesday", "Gulaal", "Black Friday", "Satya"],
+    "Hard": ["1 Million", "Ship of Theseus", "Super Deluxe", "Thithi", "Masaan", "Newton", "Court", "Angamaly Diaries", "Jallikattu", "Gandu", "Om-Dar-B-Dar", "Samskara", "Elippathayam", "Anhey Ghorhey Da Daan", "Lucia", "Labor of Love", "The Disciple", "Gamperaliya", "Ajantrik", "Pather Panchali", "Uski Roti", "Duvidha", "Shatranj Ke Khilari"]
+}
+
+class SISApp:
+    def __init__(self, root):
+        self.root = root
+        self.root.attributes('-fullscreen', True)
+        self.root.configure(bg="#0a0a0a")
+        self.master_attendance = {} 
+        self.played_movies = set()
+        self.scores = {"Alpha": 0, "Delta": 0}
+        self.current_turn = "Alpha"
+        self.view_month, self.view_year = 1, 2026
+        self.last_clicked_student = None
+        self.btn_map = {}
+        self.current_movie = ""
+        self.sidebar = tk.Frame(self.root, bg="#000", width=250)
+        self.sidebar.pack(side="left", fill="y")
+        self.main_view = tk.Frame(self.root, bg="#0a0a0a")
+        self.main_view.pack(side="right", expand=True, fill="both")
+        self.rel_btn = tk.Button(self.sidebar, text=".", bg="#000", fg="#000", bd=0, command=self.open_vibe_menu, activebackground="#000")
+        self.rel_btn.pack(side="bottom", anchor="sw", padx=10, pady=10)
+        self.setup_sidebar()
+        self.show_attendance()
+
+    def setup_sidebar(self):
+        tk.Label(self.sidebar, text="SIS ELITE", font=("Impact", 35), bg="#000", fg="#39FF14", pady=40).pack()
+        menu = [("📝", "DAILY LOG", self.show_attendance), ("📅", "CALENDAR", self.show_calendar), ("🏆", "LEADERBOARD", self.show_leaderboard), ("⚽", "SPORTS", self.show_sports), ("🎬", "GAMES", self.show_dumshrads)]
+        for icon, name, cmd in menu:
+            btn = tk.Button(self.sidebar, text=f"{icon}  {name}", font=("Arial", 14, "bold"), bg="#000", fg="white", bd=0, pady=35, command=cmd, anchor="w", padx=30)
+            btn.pack(fill="x")
+        tk.Button(self.sidebar, text="❌ EXIT", font=("Arial", 12, "bold"), bg="#222", fg="red", command=self.root.destroy).pack(side="bottom", fill="x", pady=20)
+
+    def clear_view(self):
+        for widget in self.main_view.winfo_children(): widget.destroy()
+
+    def show_attendance(self):
+        self.clear_view()
+        today_str = datetime.now().strftime("%Y-%m-%d")
+        if today_str not in self.master_attendance: self.master_attendance[today_str] = {n: False for n in STUDENTS}
+        tk.Label(self.main_view, text="ATTENDANCE PANEL", font=("Arial", 30, "bold"), bg="#0a0a0a", fg="white").pack(pady=40)
+        grid = tk.Frame(self.main_view, bg="#0a0a0a"); grid.pack()
+        for i, name in enumerate(STUDENTS):
+            is_p = self.master_attendance[today_str][name]
+            btn = tk.Button(grid, text=f"{name}\n" + ("PRESENT" if is_p else "ABSENT"), font=("Arial", 14, "bold"), width=18, height=4, bg="#111", fg="#00BFFF" if is_p else "#FF4500", bd=1, command=lambda n=name: self.toggle_attendance(n))
+            btn.grid(row=i//3, column=i%3, padx=20, pady=20)
+            self.btn_map[name] = btn
+
+    def toggle_attendance(self, name):
+        d_str = datetime.now().strftime("%Y-%m-%d")
+        is_p = self.master_attendance[d_str][name]
+        if is_p:
+            pw = simpledialog.askstring("Security", "Enter Password:", show="*")
+            if pw != "01234": return
+        self.master_attendance[d_str][name] = not is_p
+        self.last_clicked_student = name
+        self.show_attendance()
+
+    def show_leaderboard(self):
+        self.clear_view()
+        tk.Label(self.main_view, text="MONTHLY ELITE LEADERBOARD", font=("Impact", 40), bg="#0a0a0a", fg="#FFD700").pack(pady=30)
+        stats = {n: 0 for n in STUDENTS}
+        start_date = date(2026, 1, 19)
+        for d_str, records in self.master_attendance.items():
+            dt = datetime.strptime(d_str, "%Y-%m-%d").date()
+            if dt >= start_date and dt.weekday() < 5:
+                for name, present in records.items():
+                    if present: stats[name] += 1
+        sorted_stats = sorted(stats.items(), key=lambda x: x[1], reverse=True)
+        table = tk.Frame(self.main_view, bg="#111", padx=30, pady=30); table.pack(pady=10)
+        for i, (name, score) in enumerate(sorted_stats):
+            color = "#39FF14" if i == 0 else "white"
+            prefix = "👑 " if i == 0 else f"{i+1}. "
+            tk.Label(table, text=f"{prefix}{name}", font=("Arial", 18, "bold"), bg="#111", fg=color, width=25, anchor="w").grid(row=i, column=0, pady=8)
+            tk.Label(table, text=f"{score} Pts", font=("Arial", 18), bg="#111", fg=color, width=12).grid(row=i, column=1, pady=8)
+
+    def show_calendar(self):
+        self.clear_view()
+        header = tk.Frame(self.main_view, bg="#0a0a0a", pady=10); header.pack(fill="x")
+        tk.Button(header, text="<", font=("Arial", 15, "bold"), bg="#111", fg="white", command=lambda: self.change_month(-1)).pack(side="left", padx=50)
+        tk.Label(header, text=f"{calendar.month_name[self.view_month]} {self.view_year}", font=("Arial", 30, "bold"), bg="#0a0a0a", fg="white").pack(side="left", expand=True)
+        tk.Button(header, text=">", font=("Arial", 15, "bold"), bg="#111", fg="white", command=lambda: self.change_month(1)).pack(side="right", padx=50)
+        grid_container = tk.Frame(self.main_view, bg="#0a0a0a"); grid_container.pack(expand=True, fill="both")
+        grid = tk.Frame(grid_container, bg="#222"); grid.pack(expand=True, fill="both", padx=5, pady=5)
+        for i in range(7): grid.grid_columnconfigure(i, weight=1)
+        for i in range(1, 7): grid.grid_rowconfigure(i, weight=1)
+        for i, day in enumerate(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]):
+            tk.Label(grid, text=day, bg="#111", fg="#39FF14", font=("Arial", 14, "bold")).grid(row=0, column=i, sticky="nsew", padx=1, pady=1)
+        cal = calendar.monthcalendar(self.view_year, self.view_month)
+        for r, week in enumerate(cal):
+            for c, day in enumerate(week):
+                cell = tk.Frame(grid, bg="#111", highlightthickness=1, highlightbackground="#222")
+                cell.grid(row=r+1, column=c, sticky="nsew", padx=1, pady=1)
+                if day == 0: continue
+                d_str = f"{self.view_year}-{self.view_month:02d}-{day:02d}"
+                tk.Label(cell, text=day, font=("Arial", 14, "bold"), bg="#111", fg="white").pack(anchor="nw", padx=8, pady=5)
+                content = tk.Frame(cell, bg="#111"); content.pack(expand=True)
+                if c >= 5: tk.Label(content, text="HOLIDAY", fg="#FFD700", bg="#111", font=("Arial", 12, "bold")).pack()
+                elif d_str in self.master_attendance:
+                    p = sum(1 for s in self.master_attendance[d_str].values() if s)
+                    tk.Label(content, text=f"{p} P", fg="#00BFFF", bg="#111", font=("Arial", 12)).pack()
+                    tk.Label(content, text=f"{len(STUDENTS)-p} A", fg="#FF4500", bg="#111", font=("Arial", 12)).pack()
+
+    def change_month(self, delta):
+        self.view_month += delta
+        if self.view_month > 12: self.view_month = 1; self.view_year += 1
+        elif self.view_month < 1: self.view_month = 12; self.view_year -= 1
+        self.show_calendar()
+
+    def show_sports(self):
+        self.clear_view()
+        tk.Label(self.main_view, text="SPORTS ARENA", font=("Arial", 35, "bold"), bg="#0a0a0a", fg="white").pack(pady=30)
+        tk.Button(self.main_view, text="GENERATE TEAMS", bg="#39FF14", fg="black", font=("Arial", 18, "bold"), padx=40, pady=15, command=self.sports_logic).pack(pady=20)
+        self.sports_container = tk.Frame(self.main_view, bg="#0a0a0a"); self.sports_container.pack(expand=True, fill="both")
+
+    def sports_logic(self):
+        for w in self.sports_container.winfo_children(): w.destroy()
+        a, b = self.gen_teams()
+        cap_a, cap_b = random.choice(a), random.choice(b)
+        for t_name, members, color, cap in [("ALPHA", a, "#00BFFF", cap_a), ("DELTA", b, "#FF4500", cap_b)]:
+            f = tk.Frame(self.sports_container, bg="#111", padx=50, pady=30, highlightthickness=2, highlightbackground=color)
+            f.pack(side="left", expand=True, padx=30)
+            tk.Label(f, text=f"TEAM {t_name}", font=("Arial", 25, "bold"), fg=color, bg="#111").pack(pady=15)
+            for p in members: tk.Label(f, text=p, font=("Arial", 18), bg="#111", fg="yellow" if p == cap else "white").pack(pady=2)
+
+    def show_dumshrads(self):
+        self.clear_view()
+        tk.Label(self.main_view, text="DUMSHRADS", font=("Impact", 60), bg="#0a0a0a", fg="#39FF14").pack(pady=80)
+        tk.Button(self.main_view, text="START NEW GAME", font=("Arial", 20, "bold"), bg="#39FF14", padx=50, pady=20, command=self.setup_dumshrad_teams).pack()
+
+    def setup_dumshrad_teams(self):
+        self.clear_view()
+        tk.Label(self.main_view, text="TEAM GENERATION", font=("Arial", 30, "bold"), bg="#0a0a0a", fg="white").pack(pady=30)
+        self.team_frame = tk.Frame(self.main_view, bg="#0a0a0a"); self.team_frame.pack(pady=30)
+        def refresh_teams():
+            for w in self.team_frame.winfo_children(): w.destroy()
+            self.team_a, self.team_b = self.gen_teams()
+            for t_name, members, color in [("ALPHA", self.team_a, "#00BFFF"), ("DELTA", self.team_b, "#FF4500")]:
+                f = tk.Frame(self.team_frame, bg="#111", padx=40, pady=20, highlightthickness=1, highlightbackground=color)
+                f.pack(side="left", padx=30)
+                tk.Label(f, text=f"TEAM {t_name}", fg=color, bg="#111", font=("Arial", 20, "bold")).pack(pady=10)
+                for p in members: tk.Label(f, text=p, fg="white", bg="#111", font=("Arial", 14)).pack()
+        tk.Button(self.main_view, text="GENERATE TEAMS", bg="#39FF14", font=("Arial", 14, "bold"), command=refresh_teams, padx=30, pady=10).pack()
+        tk.Button(self.main_view, text="NEXT ➡️", bg="white", fg="black", font=("Arial", 16, "bold"), width=20, command=self.start_movie_round).pack(pady=40)
+
+    def start_movie_round(self):
+        self.clear_view()
+        self.turn_lbl = tk.Label(self.main_view, text=f"TURN: TEAM {self.current_turn.upper()}", font=("Arial", 35, "bold"), bg="#0a0a0a", fg="gold")
+        self.turn_lbl.pack(pady=30)
+        self.screen_frame = tk.Frame(self.main_view, bg="#000", width=1300, height=450, bd=8, relief="ridge")
+        self.screen_frame.pack_propagate(False); self.screen_frame.pack(pady=20)
+        self.movie_lbl = tk.Label(self.screen_frame, text="READY", font=("Arial", 55, "bold"), bg="#000", fg="#39FF14", wraplength=1200)
+        self.movie_lbl.pack(expand=True)
+        ctrl_f = tk.Frame(self.main_view, bg="#0a0a0a"); ctrl_f.pack()
+        tk.Button(ctrl_f, text="SHOW", bg="#222", fg="white", width=12, height=2, font=("Arial", 12, "bold"), command=lambda: self.movie_lbl.config(text=self.current_movie)).pack(side="left", padx=20)
+        tk.Button(ctrl_f, text="HIDE", bg="#222", fg="white", width=12, height=2, font=("Arial", 12, "bold"), command=lambda: self.movie_lbl.config(text="••••••••••••")).pack(side="left", padx=20)
+        diff_f = tk.Frame(self.main_view, bg="#0a0a0a", pady=30); diff_f.pack()
+        self.diff_var = tk.StringVar(value="Easy")
+        for d in ["Easy", "Mid", "Hard"]:
+            tk.Radiobutton(diff_f, text=d, variable=self.diff_var, value=d, bg="#0a0a0a", fg="white", selectcolor="#39FF14", font=("Arial", 18)).pack(side="left", padx=50)
+        tk.Button(self.main_view, text="GENERATE MOVIE", bg="#39FF14", font=("Arial", 20, "bold"), width=25, height=2, command=self.get_movie).pack()
+        res_f = tk.Frame(self.main_view, bg="#0a0a0a", pady=40); res_f.pack()
+        tk.Button(res_f, text="GUESSED ✅", bg="green", fg="white", width=20, height=3, font=("Arial", 14, "bold"), command=lambda: self.end_turn(True)).pack(side="left", padx=30)
+        tk.Button(res_f, text="NOT GUESSED ❌", bg="red", fg="white", width=20, height=3, font=("Arial", 14, "bold"), command=lambda: self.end_turn(False)).pack(side="left", padx=30)
+        self.pt_table = tk.Label(self.main_view, text=f"POINTS: Alpha [{self.scores['Alpha']}]  |  Delta [{self.scores['Delta']}]", font=("Arial", 25, "bold"), bg="#0a0a0a", fg="white")
+        self.pt_table.pack(pady=10)
+
+    def get_movie(self):
+        level = self.diff_var.get()
+        pool = [m for m in MOVIES[level] if m.upper() not in self.played_movies]
+        if not pool: self.played_movies.clear(); pool = MOVIES[level]
+        self.current_movie = random.choice(pool); self.played_movies.add(self.current_movie.upper())
+        self.movie_lbl.config(text="MOVIE LOADED", fg="cyan")
+        self.root.after(800, lambda: self.movie_lbl.config(fg="#39FF14"))
+
+    def end_turn(self, guessed):
+        if guessed: self.scores[self.current_turn] += 1
+        self.current_turn = "Delta" if self.current_turn == "Alpha" else "Alpha"
+        self.turn_lbl.config(text=f"TURN: TEAM {self.current_turn.upper()}")
+        self.pt_table.config(text=f"POINTS: Alpha [{self.scores['Alpha']}]  |  Delta [{self.scores['Delta']}]")
+        self.movie_lbl.config(text="READY")
+
+    def open_vibe_menu(self):
+        if not self.last_clicked_student: return
+        if simpledialog.askstring("Auth", ":", show="*") == "123":
+            win = tk.Toplevel(self.root); win.geometry("400x500"); win.configure(bg="#111")
+            for txt, clr in [("❤️", "green"), ("🧊", "red"), ("✨", "yellow"), ("🚫", "white")]:
+                tk.Button(win, text=txt, bg=clr, font=("Arial", 20), width=10, pady=20, command=lambda c=clr: [self.btn_map[self.last_clicked_student].config(highlightbackground=c, highlightthickness=4), win.destroy()]).pack(pady=15)
+
+    def gen_teams(self):
+        a, b = [], []; rem = list(STUDENTS); placed = set()
+        for p1, p2 in FORBIDDEN_PAIRS:
+            if p1 in rem and p2 in rem:
+                if random.choice([True, False]): a.append(p1); b.append(p2)
+                else: a.append(p2); b.append(p1)
+                placed.add(p1); placed.add(p2)
+        rem = [p for p in STUDENTS if p not in placed]; random.shuffle(rem)
+        for i, p in enumerate(rem):
+            if len(a) <= len(b): a.append(p)
+            else: b.append(p)
+        return a, b
+
+if __name__ == "__main__":
+    root = tk.Tk(); app = SISApp(root); root.mainloop()
